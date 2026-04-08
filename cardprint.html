@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CardPrint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=PT+Serif:wght@400;700&family=Playfair+Display:wght@400;700&family=Raleway:wght@400;700&family=Roboto:wght@400;700&family=Source+Sans+3:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       CSS Variables
+       ============================================================ */
+    :root {
+      --bg:        #1a1a2e;
+      --panel:     #16213e;
+      --field:     #0f3460;
+      --border:    #1a4a8a;
+      --highlight: #a8d8ea;
+      --red:       #e94560;
+      --text:      #e2e2e2;
+      --muted:     #7a8a9a;
+    }
+
+    /* ============================================================
+       Reset & Base
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ============================================================
+       Editor Panel
+       ============================================================ */
+    #editorPanel {
+      max-width: 840px;
+      margin: 0 auto;
+      padding: 28px 20px 16px;
+    }
+
+    .app-title {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--highlight);
+      margin-bottom: 28px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--highlight);
+      margin-bottom: 14px;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 0.73rem;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    select,
+    input[type="number"] {
+      display: block;
+      width: 100%;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 0.83rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    select:focus,
+    input[type="number"]:focus { border-color: var(--highlight); }
+
+    input[type="range"] {
+      display: block;
+      width: 100%;
+      accent-color: var(--highlight);
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    input[type="file"] {
+      display: block;
+      width: 100%;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 0.83rem;
+      cursor: pointer;
+    }
+
+    /* ============================================================
+       Toolbar
+       ============================================================ */
+    .toolbar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .toolbar-btn {
+      padding: 4px 14px;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+
+    .toolbar-btn:hover { background: var(--border); }
+
+    .toolbar-btn.active {
+      background: var(--highlight);
+      border-color: var(--highlight);
+      color: #0a0a1a;
+    }
+
+    /* ============================================================
+       Contenteditable Editor
+       ============================================================ */
+    #editor {
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      min-height: 110px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      outline: none;
+      word-break: break-word;
+      transition: border-color 0.15s;
+    }
+
+    #editor:focus { border-color: var(--highlight); }
+
+    /* ============================================================
+       Controls Row
+       ============================================================ */
+    .controls-row {
+      display: grid;
+      grid-template-columns: 2fr 1.2fr 0.8fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    /* ============================================================
+       Alignment Grid
+       ============================================================ */
+    .align-section {
+      margin-top: 14px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .align-section-label {
+      font-size: 0.73rem;
+      color: var(--muted);
+      padding-top: 8px;
+      min-width: 78px;
+    }
+
+    .align-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 34px);
+      grid-template-rows: repeat(3, 34px);
+      gap: 4px;
+    }
+
+    .align-btn {
+      width: 34px;
+      height: 34px;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+
+    .align-btn:hover { background: var(--border); }
+
+    .align-btn.active {
+      background: var(--highlight);
+      border-color: var(--highlight);
+      color: #0a0a1a;
+    }
+
+    /* ============================================================
+       Add Card Button
+       ============================================================ */
+    .add-btn {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      padding: 11px;
+      background: transparent;
+      border: 1.5px solid var(--highlight);
+      border-radius: 7px;
+      color: var(--highlight);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: background 0.15s;
+    }
+
+    .add-btn:hover { background: rgba(168, 216, 234, 0.1); }
+
+    /* ============================================================
+       Image Panel
+       ============================================================ */
+    .img-controls {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .img-controls.visible { display: grid; }
+
+    .slider-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .slider-val {
+      font-size: 0.75rem;
+      color: var(--highlight);
+      font-weight: 600;
+    }
+
+    .remove-img-btn {
+      display: none;
+      margin-top: 12px;
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid var(--red);
+      border-radius: 5px;
+      color: var(--red);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .remove-img-btn.visible { display: inline-block; }
+    .remove-img-btn:hover { background: var(--red); color: white; }
+
+    /* ============================================================
+       Card List
+       ============================================================ */
+    #cardList {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cl-empty {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .cl-item {
+      background: rgba(168,216,234,0.04);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .cl-info { flex: 1; min-width: 0; }
+
+    .cl-preview {
+      font-size: 0.84rem;
+      line-height: 1.5;
+      word-break: break-word;
+      margin-bottom: 4px;
+    }
+
+    .cl-meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .cl-remove {
+      flex-shrink: 0;
+      padding: 5px 10px;
+      background: transparent;
+      border: 1px solid var(--red);
+      border-radius: 4px;
+      color: var(--red);
+      font-size: 0.73rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .cl-remove:hover { background: var(--red); color: white; }
+
+    /* ============================================================
+       Info Bar
+       ============================================================ */
+    #infoBar {
+      max-width: 840px;
+      margin: 0 auto 14px;
+      padding: 10px 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--highlight);
+      font-size: 0.83rem;
+      text-align: center;
+    }
+
+    /* ============================================================
+       Print Button
+       ============================================================ */
+    #printBtn {
+      display: block;
+      margin: 0 auto 28px;
+      padding: 13px 50px;
+      background: var(--red);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      box-shadow: 0 4px 20px rgba(233,69,96,0.4);
+      transition: filter 0.15s, transform 0.1s;
+    }
+
+    #printBtn:hover { filter: brightness(1.1); }
+    #printBtn:active { transform: scale(0.98); }
+
+    /* ============================================================
+       Preview Area
+       ============================================================ */
+    #previewArea {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+      padding: 0 20px 48px;
+    }
+
+    /* ============================================================
+       Sheet
+       ============================================================ */
+    .sheet {
+      width: 297mm;
+      height: 210mm;
+      background: white;
+      box-shadow: 0 6px 32px rgba(0,0,0,0.55);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    /* ============================================================
+       Card Grid
+       ============================================================ */
+    .card-grid {
+      display: grid;
+      grid-template-columns: 143mm 143mm;
+      grid-template-rows: 100mm 100mm;
+    }
+
+    /* ============================================================
+       Card
+       ============================================================ */
+    .card {
+      width: 143mm;
+      height: 100mm;
+      box-sizing: border-box;
+      border: 3pt solid #000;
+      display: flex;
+      flex-direction: column;
+      padding: 5mm 5mm 3mm 5mm;
+      overflow: hidden;
+      background: white;
+    }
+
+    /*
+      Text area uses row flex so that:
+        justify-content = horizontal alignment  (spec: "o horizontal é justify-content")
+        align-items     = vertical   alignment  (spec: "o vertical é align-items")
+    */
+    .card-text-area {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .card-text-area p {
+      max-width: 100%;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      line-height: 1.4;
+      margin: 0;
+    }
+
+    .card-image-area {
+      flex-shrink: 0;
+      display: flex;
+      padding-bottom: 4mm;
+    }
+
+    .card-image-area img {
+      max-width: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* ============================================================
+       Print Styles
+       ============================================================ */
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    @media print {
+      html, body {
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      #editorPanel,
+      #infoBar,
+      #printBtn {
+        display: none !important;
+      }
+
+      #previewArea {
+        display: block;
+        padding: 0;
+      }
+
+      .sheet {
+        width: 297mm;
+        height: 210mm;
+        box-shadow: none !important;
+        margin: 0;
+        page-break-after: always;
+        break-after: page;
+      }
+
+      .sheet:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     EDITOR PANEL
+     ============================================================ -->
+<div id="editorPanel">
+  <h1 class="app-title">CardPrint</h1>
+
+  <!-- Text Editor -->
+  <div class="panel">
+    <div class="panel-title">Editor de Texto</div>
+
+    <div class="toolbar">
+      <button
+        id="boldBtn"
+        class="toolbar-btn"
+        title="Negrito (Ctrl+B)"
+        onmousedown="boldAction(event)"
+      >B</button>
+    </div>
+
+    <div id="editor" contenteditable="true" spellcheck="false"></div>
+
+    <div class="controls-row">
+      <div>
+        <label class="field-label" for="fontSelect">Fonte</label>
+        <select id="fontSelect" onchange="updateEditorFont()">
+          <option value="Montserrat">Montserrat</option>
+          <option value="Raleway">Raleway</option>
+          <option value="Oswald">Oswald</option>
+          <option value="Lato">Lato</option>
+          <option value="Source Sans 3">Source Sans 3</option>
+          <option value="Playfair Display">Playfair Display</option>
+          <option value="Merriweather">Merriweather</option>
+          <option value="PT Serif">PT Serif</option>
+          <option value="Roboto">Roboto</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="sizeSelect">Tamanho</label>
+        <select id="sizeSelect">
+          <option value="8pt">8pt</option>
+          <option value="10pt">10pt</option>
+          <option value="12pt">12pt</option>
+          <option value="14pt" selected>14pt</option>
+          <option value="16pt">16pt</option>
+          <option value="18pt">18pt</option>
+          <option value="20pt">20pt</option>
+          <option value="24pt">24pt</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="repeatInput">Repetir card</label>
+        <input type="number" id="repeatInput" value="1" min="1" max="200">
+      </div>
+    </div>
+
+    <div class="align-section">
+      <span class="align-section-label">Alinhamento</span>
+      <div class="align-grid" id="alignGrid">
+        <button class="align-btn" data-v="top"    data-h="left">↖</button>
+        <button class="align-btn" data-v="top"    data-h="center">↑</button>
+        <button class="align-btn" data-v="top"    data-h="right">↗</button>
+        <button class="align-btn" data-v="middle" data-h="left">←</button>
+        <button class="align-btn active" data-v="middle" data-h="center">·</button>
+        <button class="align-btn" data-v="middle" data-h="right">→</button>
+        <button class="align-btn" data-v="bottom" data-h="left">↙</button>
+        <button class="align-btn" data-v="bottom" data-h="center">↓</button>
+        <button class="align-btn" data-v="bottom" data-h="right">↘</button>
+      </div>
+    </div>
+
+    <button class="add-btn" onclick="addCard()">+ Adicionar card</button>
+  </div>
+
+  <!-- Image Panel -->
+  <div class="panel">
+    <div class="panel-title">Imagem Global</div>
+    <input
+      type="file"
+      id="imageInput"
+      accept="image/png,image/jpeg,image/webp"
+      onchange="loadImage(event)"
+    >
+
+    <div class="img-controls" id="imgControls">
+      <div>
+        <div class="slider-row">
+          <label class="field-label" style="margin:0">Altura da imagem</label>
+          <span class="slider-val"><span id="imgSizeLabel">28</span>mm</span>
+        </div>
+        <input type="range" id="imgSizeSlider" min="10" max="60" value="28" oninput="updateImgSize()">
+      </div>
+      <div>
+        <label class="field-label" for="imgAlignSelect">Alinhamento horizontal</label>
+        <select id="imgAlignSelect" onchange="render()">
+          <option value="flex-start">Esquerda</option>
+          <option value="center" selected>Centro</option>
+          <option value="flex-end">Direita</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="remove-img-btn" id="removeImgBtn" onclick="removeImage()">
+      ✕ Remover imagem
+    </button>
+  </div>
+
+  <!-- Card List Panel -->
+  <div class="panel">
+    <div class="panel-title">Cards Adicionados</div>
+    <div id="cardList">
+      <p class="cl-empty">Nenhum card adicionado ainda.</p>
+    </div>
+  </div>
+</div>
+
+<!-- INFO BAR -->
+<div id="infoBar">0 card(s) → 1 folha(s) A4 → 4 espaço(s) em branco</div>
+
+<!-- PRINT BUTTON -->
+<button id="printBtn" onclick="window.print()">Imprimir</button>
+
+<!-- PREVIEW AREA -->
+<div id="previewArea"></div>
+
+<script>
+'use strict';
+
+/* ================================================================
+   STATE
+   ================================================================ */
+let cards       = [];
+let globalImage = null;
+let imgHeight   = 28;
+let alignV      = 'middle';
+let alignH      = 'center';
+
+/* ================================================================
+   ELEMENT REFERENCES
+   ================================================================ */
+const editor        = document.getElementById('editor');
+const boldBtn       = document.getElementById('boldBtn');
+const fontSelect    = document.getElementById('fontSelect');
+const sizeSelect    = document.getElementById('sizeSelect');
+const repeatInput   = document.getElementById('repeatInput');
+const infoBar       = document.getElementById('infoBar');
+const cardListEl    = document.getElementById('cardList');
+const previewArea   = document.getElementById('previewArea');
+const imgControls   = document.getElementById('imgControls');
+const removeImgBtn  = document.getElementById('removeImgBtn');
+const imgAlignSel   = document.getElementById('imgAlignSelect');
+const imgSizeSlider = document.getElementById('imgSizeSlider');
+const imgSizeLbl    = document.getElementById('imgSizeLabel');
+
+/* ================================================================
+   ALIGNMENT MAPS
+   Row-flex text area:
+     justify-content → horizontal  (spec: "o horizontal é justify-content")
+     align-items     → vertical    (spec: "o vertical é align-items")
+   ================================================================ */
+const H_JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' };
+const V_ALIGN   = { top:  'flex-start', middle: 'center', bottom: 'flex-end' };
+const H_TEXT    = { left: 'left',       center: 'center', right:  'right'    };
+
+/* ================================================================
+   EDITOR FONT
+   ================================================================ */
+function updateEditorFont() {
+  editor.style.fontFamily = `'${fontSelect.value}', sans-serif`;
+}
+updateEditorFont();
+
+/* Prefer HTML tags (<b>) over CSS spans for execCommand */
+try { document.execCommand('styleWithCSS', false, false); } catch (_) {}
+
+/* ================================================================
+   BOLD BUTTON
+   ================================================================ */
+function boldAction(e) {
+  e.preventDefault(); /* keep selection before toggling bold */
+  document.execCommand('bold');
+  updateBoldState();
+}
+
+function updateBoldState() {
+  try {
+    boldBtn.classList.toggle('active', document.queryCommandState('bold'));
+  } catch (_) {}
+}
+
+editor.addEventListener('keyup',   updateBoldState);
+editor.addEventListener('mouseup', updateBoldState);
+editor.addEventListener('click',   updateBoldState);
+editor.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+    e.preventDefault();
+    document.execCommand('bold');
+    updateBoldState();
+  }
+});
+
+/* ================================================================
+   ALIGNMENT GRID
+   ================================================================ */
+document.querySelectorAll('.align-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    alignV = btn.dataset.v;
+    alignH = btn.dataset.h;
+    document.querySelectorAll('.align-btn').forEach(function(b) {
+      b.classList.remove('active');
+    });
+    btn.classList.add('active');
+  });
+});
+
+/* ================================================================
+   HTML SANITIZER
+   Uses DOMParser for robust traversal.
+   Keeps only <b> and <br>; block elements → <br>.
+   ================================================================ */
+function sanitizeHTML(rawHTML) {
+  var doc = new DOMParser().parseFromString(rawHTML, 'text/html');
+  var parts = [];
+
+  var BLOCK = new Set(['div','p','h1','h2','h3','h4','h5','h6','li','blockquote','tr','td','th']);
+  var SKIP  = new Set(['style','script','head','meta','link','noscript']);
+
+  function esc(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      parts.push(esc(node.textContent));
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    var tag = node.tagName.toLowerCase();
+    if (SKIP.has(tag)) return;
+    if (tag === 'br') { parts.push('<br>'); return; }
+
+    var bold = tag === 'b' || tag === 'strong' ||
+      (node.style && (node.style.fontWeight === 'bold' || node.style.fontWeight === '700'));
+
+    if (bold) parts.push('<b>');
+    for (var i = 0; i < node.childNodes.length; i++) walk(node.childNodes[i]);
+    if (bold) parts.push('</b>');
+
+    if (BLOCK.has(tag)) parts.push('<br>');
+  }
+
+  for (var i = 0; i < doc.body.childNodes.length; i++) walk(doc.body.childNodes[i]);
+
+  var result = parts.join('');
+  result = result.replace(/(<br>\s*){3,}/g, '<br><br>');
+  result = result.replace(/^(<br>\s*)+/, '').replace(/(<br>\s*)+$/, '');
+  return result;
+}
+
+/* ================================================================
+   ADD CARD
+   ================================================================ */
+function addCard() {
+  var html = sanitizeHTML(editor.innerHTML);
+  if (!html) { editor.focus(); return; }
+
+  var repeat = Math.min(200, Math.max(1, parseInt(repeatInput.value, 10) || 1));
+
+  cards.push({
+    html:   html,
+    font:   fontSelect.value,
+    size:   sizeSelect.value,
+    alignV: alignV,
+    alignH: alignH,
+    repeat: repeat
+  });
+
+  renderCardList();
+  render();
+}
+
+/* ================================================================
+   REMOVE CARD
+   ================================================================ */
+function removeCard(i) {
+  cards.splice(i, 1);
+  renderCardList();
+  render();
+}
+
+/* ================================================================
+   EXPAND CARDS (apply repeat)
+   ================================================================ */
+function expandCards() {
+  var out = [];
+  for (var i = 0; i < cards.length; i++) {
+    for (var r = 0; r < cards[i].repeat; r++) out.push(cards[i]);
+  }
+  return out;
+}
+
+/* ================================================================
+   CREATE CARD ELEMENT
+   Identical structure for both preview and print.
+   Empty slot (data = null) → card with border only.
+   ================================================================ */
+function makeCard(data) {
+  var card = document.createElement('div');
+  card.className = 'card';
+
+  if (data) {
+    /* Text area */
+    var ta = document.createElement('div');
+    ta.className = 'card-text-area';
+    ta.style.justifyContent = H_JUSTIFY[data.alignH] || 'flex-start';
+    ta.style.alignItems     = V_ALIGN[data.alignV]   || 'flex-start';
+
+    var p = document.createElement('p');
+    p.innerHTML        = data.html;
+    p.style.fontFamily = "'" + data.font + "', sans-serif";
+    p.style.fontSize   = data.size;
+    p.style.textAlign  = H_TEXT[data.alignH] || 'left';
+    ta.appendChild(p);
+    card.appendChild(ta);
+
+    /* Image area */
+    if (globalImage) {
+      var ia = document.createElement('div');
+      ia.className            = 'card-image-area';
+      ia.style.justifyContent = imgAlignSel.value;
+
+      var img = document.createElement('img');
+      img.src         = globalImage;
+      img.style.height = imgHeight + 'mm';
+      img.alt         = '';
+      ia.appendChild(img);
+      card.appendChild(ia);
+    }
+  }
+
+  return card;
+}
+
+/* ================================================================
+   RENDER CARD LIST
+   ================================================================ */
+function renderCardList() {
+  cardListEl.innerHTML = '';
+
+  if (!cards.length) {
+    cardListEl.innerHTML = '<p class="cl-empty">Nenhum card adicionado ainda.</p>';
+    return;
+  }
+
+  cards.forEach(function(c, i) {
+    var item = document.createElement('div');
+    item.className = 'cl-item';
+
+    var info = document.createElement('div');
+    info.className = 'cl-info';
+
+    var prev = document.createElement('div');
+    prev.className       = 'cl-preview';
+    prev.innerHTML       = c.html;
+    prev.style.fontFamily = "'" + c.font + "', sans-serif";
+
+    var meta = document.createElement('div');
+    meta.className   = 'cl-meta';
+    var repeatStr    = c.repeat > 1 ? ' · ×' + c.repeat : '';
+    meta.textContent = c.font + ' · ' + c.size + ' · ' + c.alignV + '/' + c.alignH + repeatStr;
+
+    info.appendChild(prev);
+    info.appendChild(meta);
+
+    var btn = document.createElement('button');
+    btn.className   = 'cl-remove';
+    btn.textContent = '✕ Remover';
+    (function(idx) { btn.onclick = function() { removeCard(idx); }; })(i);
+
+    item.appendChild(info);
+    item.appendChild(btn);
+    cardListEl.appendChild(item);
+  });
+}
+
+/* ================================================================
+   MAIN RENDER
+   ================================================================ */
+function render() {
+  var exp    = expandCards();
+  var total  = exp.length;
+  var sheets = Math.max(1, Math.ceil(total / 4));
+  var empty  = sheets * 4 - total;
+
+  infoBar.textContent =
+    total + ' card(s) → ' + sheets + ' folha(s) A4 → ' + empty + ' espaço(s) em branco';
+
+  previewArea.innerHTML = '';
+
+  for (var s = 0; s < sheets; s++) {
+    var sheet = document.createElement('div');
+    sheet.className = 'sheet';
+
+    var grid = document.createElement('div');
+    grid.className = 'card-grid';
+
+    for (var c = 0; c < 4; c++) {
+      var idx  = s * 4 + c;
+      var data = idx < exp.length ? exp[idx] : null;
+      grid.appendChild(makeCard(data));
+    }
+
+    sheet.appendChild(grid);
+    previewArea.appendChild(sheet);
+  }
+}
+
+/* ================================================================
+   IMAGE
+   ================================================================ */
+function loadImage(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    globalImage = ev.target.result;
+    imgControls.classList.add('visible');
+    removeImgBtn.classList.add('visible');
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateImgSize() {
+  imgHeight = parseInt(imgSizeSlider.value, 10);
+  imgSizeLbl.textContent = imgHeight;
+  render();
+}
+
+function removeImage() {
+  globalImage = null;
+  document.getElementById('imageInput').value = '';
+  imgControls.classList.remove('visible');
+  removeImgBtn.classList.remove('visible');
+  render();
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+render();
+</script>
+</body>
+</html>
