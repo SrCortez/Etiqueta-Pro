@@ -442,6 +442,12 @@
       overflow-wrap: break-word;
       line-height: 1.4;
       margin: 0;
+      color: #000;
+    }
+
+    .card-text-area p b,
+    .card-text-area p span {
+      color: #000;
     }
 
     .card-image-area {
@@ -454,6 +460,77 @@
       max-width: 100%;
       object-fit: contain;
       display: block;
+    }
+
+    /* ============================================================
+       Custom Font Select
+       ============================================================ */
+    .custom-select-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-select-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.15s;
+    }
+
+    .custom-select-trigger:hover,
+    .custom-select-trigger.open { border-color: var(--highlight); }
+
+    .custom-select-arrow {
+      font-size: 0.7rem;
+      margin-left: 6px;
+      flex-shrink: 0;
+      transition: transform 0.15s;
+      color: var(--muted);
+    }
+
+    .custom-select-trigger.open .custom-select-arrow {
+      transform: rotate(180deg);
+    }
+
+    .custom-select-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 2px);
+      left: 0;
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      z-index: 200;
+      max-height: 250px;
+      overflow-y: auto;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+    }
+
+    .custom-select-dropdown.open { display: block; }
+
+    .custom-select-option {
+      padding: 9px 12px;
+      cursor: pointer;
+      font-size: 0.92rem;
+      color: var(--text);
+      transition: background 0.1s;
+    }
+
+    .custom-select-option:hover { background: var(--field); }
+
+    .custom-select-option.selected {
+      color: var(--highlight);
+      background: rgba(168, 216, 234, 0.08);
     }
 
     /* ============================================================
@@ -528,18 +605,24 @@
 
     <div class="controls-row">
       <div>
-        <label class="field-label" for="fontSelect">Fonte</label>
-        <select id="fontSelect" onchange="updateEditorFont()">
-          <option value="Montserrat">Montserrat</option>
-          <option value="Raleway">Raleway</option>
-          <option value="Oswald">Oswald</option>
-          <option value="Lato">Lato</option>
-          <option value="Source Sans 3">Source Sans 3</option>
-          <option value="Playfair Display">Playfair Display</option>
-          <option value="Merriweather">Merriweather</option>
-          <option value="PT Serif">PT Serif</option>
-          <option value="Roboto">Roboto</option>
-        </select>
+        <label class="field-label">Fonte</label>
+        <div class="custom-select-wrapper">
+          <div class="custom-select-trigger" id="fontSelectTrigger">
+            <span id="fontSelectText" style="font-family:'Montserrat',sans-serif;">Montserrat</span>
+            <span class="custom-select-arrow">▾</span>
+          </div>
+          <div class="custom-select-dropdown" id="fontSelectDropdown">
+            <div class="custom-select-option selected" data-value="Montserrat" style="font-family:'Montserrat',sans-serif;">Montserrat</div>
+            <div class="custom-select-option" data-value="Raleway" style="font-family:'Raleway',sans-serif;">Raleway</div>
+            <div class="custom-select-option" data-value="Oswald" style="font-family:'Oswald',sans-serif;">Oswald</div>
+            <div class="custom-select-option" data-value="Lato" style="font-family:'Lato',sans-serif;">Lato</div>
+            <div class="custom-select-option" data-value="Source Sans 3" style="font-family:'Source Sans 3',sans-serif;">Source Sans 3</div>
+            <div class="custom-select-option" data-value="Playfair Display" style="font-family:'Playfair Display',sans-serif;">Playfair Display</div>
+            <div class="custom-select-option" data-value="Merriweather" style="font-family:'Merriweather',sans-serif;">Merriweather</div>
+            <div class="custom-select-option" data-value="PT Serif" style="font-family:'PT Serif',sans-serif;">PT Serif</div>
+            <div class="custom-select-option" data-value="Roboto" style="font-family:'Roboto',sans-serif;">Roboto</div>
+          </div>
+        </div>
       </div>
       <div>
         <label class="field-label" for="sizeSelect">Tamanho</label>
@@ -547,11 +630,15 @@
           <option value="8pt">8pt</option>
           <option value="10pt">10pt</option>
           <option value="12pt">12pt</option>
-          <option value="14pt" selected>14pt</option>
+          <option value="14pt">14pt</option>
           <option value="16pt">16pt</option>
           <option value="18pt">18pt</option>
-          <option value="20pt">20pt</option>
+          <option value="20pt" selected>20pt</option>
           <option value="24pt">24pt</option>
+          <option value="28pt">28pt</option>
+          <option value="32pt">32pt</option>
+          <option value="36pt">36pt</option>
+          <option value="40pt">40pt</option>
         </select>
       </div>
       <div>
@@ -646,7 +733,6 @@ let alignH      = 'center';
    ================================================================ */
 const editor        = document.getElementById('editor');
 const boldBtn       = document.getElementById('boldBtn');
-const fontSelect    = document.getElementById('fontSelect');
 const sizeSelect    = document.getElementById('sizeSelect');
 const repeatInput   = document.getElementById('repeatInput');
 const infoBar       = document.getElementById('infoBar');
@@ -669,10 +755,46 @@ const V_ALIGN   = { top:  'flex-start', middle: 'center', bottom: 'flex-end' };
 const H_TEXT    = { left: 'left',       center: 'center', right:  'right'    };
 
 /* ================================================================
+   CUSTOM FONT SELECT
+   ================================================================ */
+let selectedFont = 'Montserrat';
+
+const fontTrigger   = document.getElementById('fontSelectTrigger');
+const fontDropdown  = document.getElementById('fontSelectDropdown');
+const fontSelectTxt = document.getElementById('fontSelectText');
+
+fontTrigger.addEventListener('click', function(e) {
+  e.stopPropagation();
+  var isOpen = fontDropdown.classList.contains('open');
+  fontTrigger.classList.toggle('open', !isOpen);
+  fontDropdown.classList.toggle('open', !isOpen);
+});
+
+document.querySelectorAll('.custom-select-option').forEach(function(opt) {
+  opt.addEventListener('click', function() {
+    selectedFont = opt.dataset.value;
+    fontSelectTxt.textContent = selectedFont;
+    fontSelectTxt.style.fontFamily = "'" + selectedFont + "', sans-serif";
+    document.querySelectorAll('.custom-select-option').forEach(function(o) {
+      o.classList.remove('selected');
+    });
+    opt.classList.add('selected');
+    fontTrigger.classList.remove('open');
+    fontDropdown.classList.remove('open');
+    updateEditorFont();
+  });
+});
+
+document.addEventListener('click', function() {
+  fontTrigger.classList.remove('open');
+  fontDropdown.classList.remove('open');
+});
+
+/* ================================================================
    EDITOR FONT
    ================================================================ */
 function updateEditorFont() {
-  editor.style.fontFamily = `'${fontSelect.value}', sans-serif`;
+  editor.style.fontFamily = "'" + selectedFont + "', sans-serif";
 }
 updateEditorFont();
 
@@ -778,7 +900,7 @@ function addCard() {
 
   cards.push({
     html:   html,
-    font:   fontSelect.value,
+    font:   selectedFont,
     size:   sizeSelect.value,
     alignV: alignV,
     alignH: alignH,
@@ -830,6 +952,7 @@ function makeCard(data) {
     p.style.fontFamily = "'" + data.font + "', sans-serif";
     p.style.fontSize   = data.size;
     p.style.textAlign  = H_TEXT[data.alignH] || 'left';
+    p.style.color      = '#000000';
     ta.appendChild(p);
     card.appendChild(ta);
 
