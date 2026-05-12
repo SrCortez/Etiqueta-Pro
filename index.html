@@ -825,6 +825,10 @@ editor.addEventListener('keyup',   updateBoldState);
 editor.addEventListener('mouseup', updateBoldState);
 editor.addEventListener('click',   updateBoldState);
 editor.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.execCommand('insertLineBreak');
+  }
   if (e.ctrlKey && e.key.toLowerCase() === 'b') {
     e.preventDefault();
     document.execCommand('bold');
@@ -848,50 +852,17 @@ document.querySelectorAll('.align-btn').forEach(function(btn) {
 
 /* ================================================================
    HTML SANITIZER
-   Uses DOMParser for robust traversal.
-   Keeps only <b> and <br>; block elements → <br>.
+   Converts editor HTML to plain text + <b> tags, using \n for line breaks.
    ================================================================ */
 function sanitizeHTML(rawHTML) {
-  var doc = new DOMParser().parseFromString(rawHTML, 'text/html');
-  var parts = [];
-
-  var BLOCK = new Set(['div','p','h1','h2','h3','h4','h5','h6','li','blockquote','tr','td','th']);
-  var SKIP  = new Set(['style','script','head','meta','link','noscript']);
-
-  function esc(text) {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-
-  function walk(node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      parts.push(esc(node.textContent));
-      return;
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) return;
-
-    var tag = node.tagName.toLowerCase();
-    if (SKIP.has(tag)) return;
-    if (tag === 'br') { parts.push('<br>'); return; }
-
-    var bold = tag === 'b' || tag === 'strong' ||
-      (node.style && (node.style.fontWeight === 'bold' || node.style.fontWeight === '700'));
-
-    if (bold) parts.push('<b>');
-    for (var i = 0; i < node.childNodes.length; i++) walk(node.childNodes[i]);
-    if (bold) parts.push('</b>');
-
-    if (BLOCK.has(tag)) parts.push('<br>');
-  }
-
-  for (var i = 0; i < doc.body.childNodes.length; i++) walk(doc.body.childNodes[i]);
-
-  var result = parts.join('');
-  result = result.replace(/(<br>\s*){3,}/g, '<br><br>');
-  result = result.replace(/^(<br>\s*)+/, '').replace(/(<br>\s*)+$/, '');
-  return result;
+  var h = rawHTML;
+  h = h.replace(/<br\s*\/?>/gi, '\n');
+  h = h.replace(/<\/(div|p|li)>/gi, '\n');
+  h = h.replace(/<(div|p|li)[^>]*>/gi, '');
+  h = h.replace(/<strong>/gi, '<b>').replace(/<\/strong>/gi, '</b>');
+  h = h.replace(/<(?!\/?b[\s>])[^>]+>/gi, '');
+  h = h.replace(/\n{3,}/g, '\n\n').trim();
+  return h;
 }
 
 /* ================================================================
@@ -953,7 +924,7 @@ function makeCard(data) {
     ta.style.alignItems     = V_ALIGN[data.alignV]   || 'flex-start';
 
     var p = document.createElement('p');
-    p.innerHTML        = data.html;
+    p.innerHTML        = data.html.replace(/\n/g, '<br>');
     p.style.fontFamily = "'" + data.font + "', sans-serif";
     p.style.fontSize   = data.size;
     p.style.textAlign  = H_TEXT[data.alignH] || 'left';
@@ -999,7 +970,7 @@ function renderCardList() {
 
     var prev = document.createElement('div');
     prev.className       = 'cl-preview';
-    prev.innerHTML       = c.html;
+    prev.innerHTML       = c.html.replace(/\n/g, '<br>');
     prev.style.fontFamily = "'" + c.font + "', sans-serif";
 
     var meta = document.createElement('div');
