@@ -417,9 +417,14 @@
     /* ============================================================
        Info Bar
        ============================================================ */
-    #infoBar {
+    #previewHeader {
       max-width: 840px;
-      margin: 0 auto 14px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    #infoBar {
+      margin-bottom: 14px;
       padding: 10px 20px;
       background: var(--panel);
       border: 1px solid var(--border);
@@ -461,6 +466,71 @@
       align-items: center;
       gap: 28px;
       padding: 0 20px 48px;
+    }
+
+    /* ============================================================
+       Wide screens: editor on the left, sheets on the right
+       ============================================================ */
+    @media (min-width: 1100px) {
+      #app {
+        display: grid;
+        grid-template-columns: minmax(460px, 36%) minmax(0, 1fr);
+        align-items: start;
+      }
+
+      #editorPanel {
+        position: sticky;
+        top: 0;
+        max-width: none;
+        height: 100vh;
+        overflow-y: auto;
+        padding: 24px 20px 24px 24px;
+      }
+
+      #previewHeader {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        max-width: none;
+        padding: 24px 24px 14px;
+        background: var(--bg);
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+
+      #infoBar { flex: 1; margin: 0; }
+      #printBtn { margin: 0; padding: 11px 36px; }
+
+      #previewArea { padding: 10px 24px 48px; }
+
+      /* Denser controls in the narrower column */
+      .layout-picker { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 760px) {
+      .layout-picker { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ============================================================
+       Draft (live preview of the text being typed)
+       ============================================================ */
+    .card.draft {
+      position: relative;
+      background: #f3f8ff;
+    }
+
+    .card.draft::after {
+      content: 'PRÉVIA';
+      position: absolute;
+      top: 2mm;
+      right: 2mm;
+      padding: 0.6mm 2mm;
+      border-radius: 1.5mm;
+      background: #2563eb;
+      color: #fff;
+      font: 700 7pt system-ui, sans-serif;
+      letter-spacing: 0.06em;
     }
 
     /* ============================================================
@@ -629,14 +699,16 @@
       }
 
       #editorPanel,
-      #infoBar,
-      #printBtn {
+      #previewHeader {
         display: none !important;
       }
 
+      #app { display: block !important; }
+
       #previewArea {
         display: block;
-        padding: 0;
+        padding: 0 !important;
+        zoom: 1 !important;
       }
 
       .sheet {
@@ -668,6 +740,7 @@
 </head>
 <body>
 
+<div id="app">
 <!-- ============================================================
      EDITOR PANEL
      ============================================================ -->
@@ -822,14 +895,17 @@
   </div>
 </div>
 
-<!-- INFO BAR -->
-<div id="infoBar">0 card(s) → 1 folha(s) A4 → 4 espaço(s) em branco</div>
-
-<!-- PRINT BUTTON -->
-<button id="printBtn" onclick="window.print()">Imprimir</button>
-
-<!-- PREVIEW AREA -->
-<div id="previewArea"></div>
+<!-- ============================================================
+     PREVIEW COLUMN
+     ============================================================ -->
+<div id="previewCol">
+  <div id="previewHeader">
+    <div id="infoBar">0 card(s) → 1 folha(s) A4 → 4 espaço(s) em branco</div>
+    <button id="printBtn" onclick="printSheets()">Imprimir</button>
+  </div>
+  <div id="previewArea"></div>
+</div>
+</div>
 
 <script>
 'use strict';
@@ -908,6 +984,7 @@ document.querySelectorAll('.custom-select-option').forEach(function(opt) {
     fontTrigger.classList.remove('open');
     fontDropdown.classList.remove('open');
     updateEditorFont();
+    scheduleRender();
   });
 });
 
@@ -937,7 +1014,7 @@ document.querySelectorAll('.layout-btn').forEach(function(btn) {
     document.querySelectorAll('.layout-btn').forEach(function(b) {
       b.classList.toggle('active', b === btn);
     });
-    if (!cards.length) render();
+    scheduleRender();
   });
 });
 
@@ -1039,6 +1116,7 @@ sizeSelect.addEventListener('change', function() {
     baseSize = size;
     updateEditorFont();
   }
+  scheduleRender();
 });
 
 /* ================================================================
@@ -1120,6 +1198,7 @@ document.querySelectorAll('.align-btn').forEach(function(btn) {
       b.classList.remove('active');
     });
     btn.classList.add('active');
+    scheduleRender();
   });
 });
 
@@ -1167,7 +1246,7 @@ function addCard() {
   var html = sanitizeHTML(editor);
   if (!html) { editor.focus(); return; }
 
-  var repeat = Math.min(200, Math.max(1, parseInt(repeatInput.value, 10) || 1));
+  var repeat = repeatCount();
 
   cards.push({
     html:   html,
@@ -1179,6 +1258,9 @@ function addCard() {
     repeat: repeat
   });
 
+  /* Clear the editor so the draft preview doesn't duplicate the card just added. */
+  editor.innerHTML = '';
+  repeatInput.value = 1;
   renderCardList();
   render();
 }
@@ -1196,12 +1278,80 @@ function removeCard(i) {
    EXPAND CARDS (apply repeat)
    ================================================================ */
 function expandCards() {
-  var out = [];
-  for (var i = 0; i < cards.length; i++) {
-    for (var r = 0; r < cards[i].repeat; r++) out.push(cards[i]);
+  var out  = [];
+  var list = cards.slice();
+  var d    = draftCard();
+  if (d) list.push(d);
+  for (var i = 0; i < list.length; i++) {
+    for (var r = 0; r < list[i].repeat; r++) out.push(list[i]);
   }
   return out;
 }
+
+/* ================================================================
+   DRAFT — what is in the editor right now, shown in the preview
+   (never printed; the print button offers to add it first)
+   ================================================================ */
+let printing = false;
+
+function repeatCount() {
+  return Math.min(200, Math.max(1, parseInt(repeatInput.value, 10) || 1));
+}
+
+function draftCard() {
+  if (printing) return null;
+  var html = sanitizeHTML(editor);
+  if (!html) return null;
+  return {
+    html:   html,
+    font:   selectedFont,
+    size:   baseSize,
+    layout: currentLayout,
+    alignV: alignV,
+    alignH: alignH,
+    repeat: repeatCount(),
+    draft:  true
+  };
+}
+
+let renderQueued = 0;
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = requestAnimationFrame(function() {
+    renderQueued = 0;
+    render();
+  });
+}
+
+editor.addEventListener('input', scheduleRender);
+repeatInput.addEventListener('input', scheduleRender);
+
+/* ================================================================
+   PRINT
+   ================================================================ */
+function printSheets() {
+  if (draftCard() && confirm('O texto do editor ainda não foi adicionado.\n\nOK = adicionar e imprimir\nCancelar = imprimir sem ele')) {
+    addCard();
+  }
+  window.print();
+}
+
+window.addEventListener('beforeprint', function() { printing = true;  render(); });
+window.addEventListener('afterprint',  function() { printing = false; render(); });
+
+/* ================================================================
+   FIT PREVIEW TO AVAILABLE WIDTH
+   ================================================================ */
+const previewCol = document.getElementById('previewCol');
+const MM_PX      = 96 / 25.4;
+
+function fitPreview() {
+  var widest = previewArea.querySelector('.sheet:not(.portrait)') ? 297 : 210;
+  var need   = widest * MM_PX + 48;
+  previewArea.style.zoom = Math.min(1, previewCol.clientWidth / need);
+}
+
+window.addEventListener('resize', fitPreview);
 
 /* ================================================================
    CREATE CARD ELEMENT
@@ -1210,7 +1360,7 @@ function expandCards() {
    ================================================================ */
 function makeCard(data, L) {
   var card = document.createElement('div');
-  card.className    = 'card';
+  card.className    = data && data.draft ? 'card draft' : 'card';
   card.style.width  = L.w + 'mm';
   card.style.height = L.h + 'mm';
 
@@ -1338,8 +1488,12 @@ function render() {
     }
   });
 
-  infoBar.textContent = exp.length + ' card(s) → ' + totalSheets + ' folha(s) A4 (' +
-    parts.join(' · ') + ') → ' + empty + ' espaço(s) em branco';
+  var drafts  = exp.filter(function(c) { return c.draft; }).length;
+  var added   = exp.length - drafts;
+  infoBar.textContent = added + ' card(s)' + (drafts ? ' + ' + drafts + ' em prévia' : '') +
+    ' → ' + totalSheets + ' folha(s) A4 (' + parts.join(' · ') + ') → ' + empty + ' espaço(s) em branco';
+
+  fitPreview();
 }
 
 /* ================================================================
