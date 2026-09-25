@@ -149,21 +149,95 @@
     /* ============================================================
        Contenteditable Editor
        ============================================================ */
+    /* White "paper" background so typed text always has the same contrast as the printed card. */
+    .editor-frame {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .editor-frame:focus-within {
+      border-color: var(--highlight);
+      box-shadow: 0 0 0 2px rgba(168, 216, 234, 0.25);
+    }
+
+    /* Real pt sizes, scaled down so large sizes still fit the panel. */
     #editor {
+      zoom: 0.6;
+      min-height: 190px;
+      padding: 18px 22px;
+      color: #000;
+      caret-color: #000;
+      line-height: 1.4;
+      outline: none;
+      word-break: break-word;
+    }
+
+    #editor * {
+      color: inherit !important;
+      background: transparent !important;
+    }
+
+    #editor:empty::before {
+      content: 'Digite o texto do card…';
+      color: #999;
+    }
+
+    .field-hint {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ============================================================
+       Layout Picker
+       ============================================================ */
+    .layout-picker {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .layout-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
       background: var(--field);
       border: 1px solid var(--border);
       border-radius: 6px;
-      min-height: 110px;
-      padding: 10px 12px;
       color: var(--text);
-      font-size: 0.95rem;
-      line-height: 1.6;
-      outline: none;
-      word-break: break-word;
-      transition: border-color 0.15s;
+      font-size: 0.8rem;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
 
-    #editor:focus { border-color: var(--highlight); }
+    .layout-btn:hover { background: var(--border); }
+
+    .layout-btn.active {
+      background: var(--highlight);
+      border-color: var(--highlight);
+      color: #0a0a1a;
+    }
+
+    .layout-icon {
+      flex-shrink: 0;
+      display: grid;
+      width: 38px;
+      height: 27px;
+      gap: 2px;
+      padding: 2px;
+      border: 1px solid currentColor;
+      border-radius: 2px;
+    }
+
+    .layout-icon i { border: 1.5px solid currentColor; }
+    .li-half    { grid-template-columns: 1fr 1fr; }
+    .li-vhalf   { width: 27px; height: 38px; grid-template-rows: 1fr 1fr; }
+    .li-quarter { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
 
     /* ============================================================
        Controls Row
@@ -318,6 +392,8 @@
       margin-bottom: 4px;
     }
 
+    .cl-preview span { font-size: inherit !important; }
+
     .cl-meta {
       font-size: 0.7rem;
       color: var(--muted);
@@ -401,21 +477,20 @@
       flex-shrink: 0;
     }
 
-    /* ============================================================
-       Card Grid
-       ============================================================ */
-    .card-grid {
-      display: grid;
-      grid-template-columns: 143mm 143mm;
-      grid-template-rows: 100mm 100mm;
+    .sheet.portrait {
+      width: 210mm;
+      height: 297mm;
     }
 
     /* ============================================================
-       Card
+       Card Grid
+       ============================================================ */
+    .card-grid { display: grid; }
+
+    /* ============================================================
+       Card (dimensions set per layout in JS)
        ============================================================ */
     .card {
-      width: 143mm;
-      height: 100mm;
       box-sizing: border-box;
       border: 3pt solid #000;
       display: flex;
@@ -541,6 +616,11 @@
       margin: 0;
     }
 
+    @page portrait-sheet {
+      size: A4 portrait;
+      margin: 0;
+    }
+
     @media print {
       html, body {
         background: white !important;
@@ -568,6 +648,12 @@
         break-after: page;
       }
 
+      .sheet.portrait {
+        width: 210mm;
+        height: 297mm;
+        page: portrait-sheet;
+      }
+
       .sheet:last-child {
         page-break-after: auto;
         break-after: auto;
@@ -592,6 +678,22 @@
   <div class="panel">
     <div class="panel-title">Editor de Texto</div>
 
+    <label class="field-label">Layout do card</label>
+    <div class="layout-picker" id="layoutPicker">
+      <button class="layout-btn" data-layout="full">
+        <span class="layout-icon"><i></i></span>Página inteira
+      </button>
+      <button class="layout-btn" data-layout="half">
+        <span class="layout-icon li-half"><i></i><i></i></span>1/2 página (paisagem)
+      </button>
+      <button class="layout-btn" data-layout="vhalf">
+        <span class="layout-icon li-vhalf"><i></i><i></i></span>1/2 página (retrato)
+      </button>
+      <button class="layout-btn active" data-layout="quarter">
+        <span class="layout-icon li-quarter"><i></i><i></i><i></i><i></i></span>1/4 página
+      </button>
+    </div>
+
     <div class="toolbar">
       <button
         id="boldBtn"
@@ -601,7 +703,9 @@
       >B</button>
     </div>
 
-    <div id="editor" contenteditable="true" spellcheck="false"></div>
+    <div class="editor-frame">
+      <div id="editor" contenteditable="true" spellcheck="false"></div>
+    </div>
 
     <div class="controls-row">
       <div>
@@ -644,7 +748,13 @@
           <option value="52pt">52pt</option>
           <option value="56pt">56pt</option>
           <option value="60pt">60pt</option>
+          <option value="72pt">72pt</option>
+          <option value="80pt">80pt</option>
+          <option value="96pt">96pt</option>
+          <option value="120pt">120pt</option>
+          <option value="144pt">144pt</option>
         </select>
+        <div class="field-hint">Com trecho selecionado, muda só ele.</div>
       </div>
       <div>
         <label class="field-label" for="repeatInput">Repetir card</label>
@@ -732,6 +842,17 @@ let globalImage = null;
 let imgHeight   = 28;
 let alignV      = 'middle';
 let alignH      = 'center';
+let baseSize      = '20pt';
+let currentLayout = 'quarter';
+let savedRange    = null;
+
+/* Card sizes in mm inside an A4 landscape sheet (297×210). */
+const LAYOUTS = {
+  full:    { label: 'Página inteira',        short: 'Inteira', perSheet: 1, cols: 1, rows: 1, w: 286, h: 200 },
+  half:    { label: '1/2 página (paisagem)', short: '1/2 paisagem', perSheet: 2, cols: 2, rows: 1, w: 143, h: 200 },
+  vhalf:   { label: '1/2 página (retrato)',  short: '1/2 retrato',  perSheet: 2, cols: 1, rows: 2, w: 200, h: 143, portrait: true },
+  quarter: { label: '1/4 página',            short: '1/4',     perSheet: 4, cols: 2, rows: 2, w: 143, h: 100 }
+};
 
 /* ================================================================
    ELEMENT REFERENCES
@@ -800,11 +921,163 @@ document.addEventListener('click', function() {
    ================================================================ */
 function updateEditorFont() {
   editor.style.fontFamily = "'" + selectedFont + "', sans-serif";
+  editor.style.fontSize   = baseSize;
 }
 updateEditorFont();
 
 /* Prefer HTML tags (<b>) over CSS spans for execCommand */
 try { document.execCommand('styleWithCSS', false, false); } catch (_) {}
+
+/* ================================================================
+   LAYOUT PICKER
+   ================================================================ */
+document.querySelectorAll('.layout-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    currentLayout = btn.dataset.layout;
+    document.querySelectorAll('.layout-btn').forEach(function(b) {
+      b.classList.toggle('active', b === btn);
+    });
+    if (!cards.length) render();
+  });
+});
+
+/* ================================================================
+   PER-SELECTION FONT SIZE
+   With a selection: only the selected text changes.
+   Caret inside a sized span: that span changes.
+   Otherwise: the card's base size changes.
+   ================================================================ */
+var SIZE_RE = /^\d+(\.\d+)?pt$/;
+
+function sizedSpanAt(node) {
+  while (node && node !== editor) {
+    if (node.nodeType === 1 && node.tagName === 'SPAN' && SIZE_RE.test(node.style.fontSize)) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+function nodeAtStart(r) {
+  var n = r.startContainer;
+  if (n.nodeType === 1 && n.childNodes[r.startOffset]) n = n.childNodes[r.startOffset];
+  return n;
+}
+
+function inEditor(r) {
+  return r && editor.contains(r.commonAncestorContainer);
+}
+
+function syncSizeSelect(size) {
+  if (!Array.prototype.some.call(sizeSelect.options, function(o) { return o.value === size; })) {
+    var opt = document.createElement('option');
+    opt.value = opt.textContent = size;
+    sizeSelect.appendChild(opt);
+  }
+  sizeSelect.value = size;
+}
+
+function unwrap(el) {
+  while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+  el.remove();
+}
+
+function selectNodeContents(node) {
+  var r = document.createRange();
+  r.selectNodeContents(node);
+  editor.focus();
+  var sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+  savedRange = r.cloneRange();
+}
+
+function applySizeToRange(range, size) {
+  var frag = range.extractContents();
+  Array.prototype.forEach.call(frag.querySelectorAll('span'), function(s) {
+    s.style.fontSize = '';
+    if (!s.getAttribute('style')) unwrap(s);
+  });
+  var span = document.createElement('span');
+  span.style.fontSize = size;
+  span.appendChild(frag);
+  range.insertNode(span);
+  editor.querySelectorAll('span, b').forEach(function(el) {
+    if (!el.textContent && !el.querySelector('br')) el.remove();
+  });
+  selectNodeContents(span);
+}
+
+document.addEventListener('selectionchange', function() {
+  var sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  var r = sel.getRangeAt(0);
+  if (!inEditor(r)) return;
+  savedRange = r.cloneRange();
+  var span = sizedSpanAt(nodeAtStart(r));
+  syncSizeSelect(span ? span.style.fontSize : baseSize);
+  updateBoldState();
+});
+
+/* Clicking anywhere but the editor / size box drops the remembered selection. */
+document.addEventListener('mousedown', function(e) {
+  if (editor.contains(e.target) || sizeSelect.contains(e.target)) return;
+  savedRange = null;
+  syncSizeSelect(baseSize);
+});
+
+sizeSelect.addEventListener('change', function() {
+  var size = sizeSelect.value;
+  var r = inEditor(savedRange) ? savedRange : null;
+  var span = r ? sizedSpanAt(nodeAtStart(r)) : null;
+
+  if (r && !r.collapsed) {
+    applySizeToRange(r, size);
+  } else if (span) {
+    span.style.fontSize = size;
+    selectNodeContents(span);
+  } else {
+    baseSize = size;
+    updateEditorFont();
+  }
+});
+
+/* ================================================================
+   PLAIN-TEXT PASTE / DROP
+   Strips colors, backgrounds and fonts from copied content.
+   ================================================================ */
+function insertPlainText(text) {
+  text.replace(/\r\n?/g, '\n').split('\n').forEach(function(line, i) {
+    if (i) document.execCommand('insertLineBreak');
+    if (line) document.execCommand('insertText', false, line);
+  });
+}
+
+editor.addEventListener('paste', function(e) {
+  e.preventDefault();
+  insertPlainText((e.clipboardData || window.clipboardData).getData('text/plain'));
+});
+
+editor.addEventListener('dragstart', function(e) { e.preventDefault(); });
+
+editor.addEventListener('drop', function(e) {
+  e.preventDefault();
+  var text = e.dataTransfer.getData('text/plain');
+  if (!text) return;
+  var r = null;
+  if (document.caretRangeFromPoint) {
+    r = document.caretRangeFromPoint(e.clientX, e.clientY);
+  } else if (document.caretPositionFromPoint) {
+    var p = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (p) { r = document.createRange(); r.setStart(p.offsetNode, p.offset); }
+  }
+  editor.focus();
+  if (r && editor.contains(r.startContainer)) {
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+  insertPlainText(text);
+});
 
 /* ================================================================
    BOLD BUTTON
@@ -852,24 +1125,46 @@ document.querySelectorAll('.align-btn').forEach(function(btn) {
 
 /* ================================================================
    HTML SANITIZER
-   Converts editor HTML to plain text + <b> tags, using \n for line breaks.
+   Keeps only text, <br>, <b> and <span style="font-size:Npt">.
    ================================================================ */
-function sanitizeHTML(rawHTML) {
-  var h = rawHTML;
-  h = h.replace(/<br\s*\/?>/gi, '\n');
-  h = h.replace(/<\/(div|p|li)>/gi, '\n');
-  h = h.replace(/<(div|p|li)[^>]*>/gi, '');
-  h = h.replace(/<strong>/gi, '<b>').replace(/<\/strong>/gi, '</b>');
-  h = h.replace(/<(?!\/?b[\s>])[^>]+>/gi, '');
-  h = h.replace(/\n{3,}/g, '\n\n').trim();
-  return h;
+function escapeHTML(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function serializeNodes(parent) {
+  var out = '';
+  parent.childNodes.forEach(function(n) {
+    if (n.nodeType === 3) { out += escapeHTML(n.nodeValue); return; }
+    if (n.nodeType !== 1) return;
+    var tag   = n.tagName;
+    var inner = serializeNodes(n);
+    if (tag === 'BR') {
+      out += '<br>';
+    } else if (tag === 'B' || tag === 'STRONG') {
+      if (inner) out += '<b>' + inner + '</b>';
+    } else if (tag === 'SPAN' && SIZE_RE.test(n.style.fontSize)) {
+      if (inner) out += '<span style="font-size:' + n.style.fontSize + '">' + inner + '</span>';
+    } else if (tag === 'DIV' || tag === 'P' || tag === 'LI') {
+      out += (out && !/<br>$/.test(out) ? '<br>' : '') + inner;
+    } else {
+      out += inner;
+    }
+  });
+  return out;
+}
+
+function sanitizeHTML(root) {
+  if (!root.textContent.trim()) return '';
+  return serializeNodes(root)
+    .replace(/(<br>){3,}/g, '<br><br>')
+    .replace(/^(<br>)+|(<br>)+$/g, '');
 }
 
 /* ================================================================
    ADD CARD
    ================================================================ */
 function addCard() {
-  var html = sanitizeHTML(editor.innerHTML);
+  var html = sanitizeHTML(editor);
   if (!html) { editor.focus(); return; }
 
   var repeat = Math.min(200, Math.max(1, parseInt(repeatInput.value, 10) || 1));
@@ -877,7 +1172,8 @@ function addCard() {
   cards.push({
     html:   html,
     font:   selectedFont,
-    size:   sizeSelect.value,
+    size:   baseSize,
+    layout: currentLayout,
     alignV: alignV,
     alignH: alignH,
     repeat: repeat
@@ -912,9 +1208,11 @@ function expandCards() {
    Identical structure for both preview and print.
    Empty slot (data = null) → card with border only.
    ================================================================ */
-function makeCard(data) {
+function makeCard(data, L) {
   var card = document.createElement('div');
-  card.className = 'card';
+  card.className    = 'card';
+  card.style.width  = L.w + 'mm';
+  card.style.height = L.h + 'mm';
 
   if (data) {
     /* Text area */
@@ -924,7 +1222,7 @@ function makeCard(data) {
     ta.style.alignItems     = V_ALIGN[data.alignV]   || 'flex-start';
 
     var p = document.createElement('p');
-    p.innerHTML        = data.html.replace(/\n/g, '<br>');
+    p.innerHTML        = data.html;
     p.style.fontFamily = "'" + data.font + "', sans-serif";
     p.style.fontSize   = data.size;
     p.style.textAlign  = H_TEXT[data.alignH] || 'left';
@@ -970,13 +1268,13 @@ function renderCardList() {
 
     var prev = document.createElement('div');
     prev.className       = 'cl-preview';
-    prev.innerHTML       = c.html.replace(/\n/g, '<br>');
+    prev.innerHTML       = c.html;
     prev.style.fontFamily = "'" + c.font + "', sans-serif";
 
     var meta = document.createElement('div');
     meta.className   = 'cl-meta';
     var repeatStr    = c.repeat > 1 ? ' · ×' + c.repeat : '';
-    meta.textContent = c.font + ' · ' + c.size + ' · ' + c.alignV + '/' + c.alignH + repeatStr;
+    meta.textContent = LAYOUTS[c.layout].label + ' · ' + c.font + ' · ' + c.size + ' · ' + c.alignV + '/' + c.alignH + repeatStr;
 
     info.appendChild(prev);
     info.appendChild(meta);
@@ -995,33 +1293,53 @@ function renderCardList() {
 /* ================================================================
    MAIN RENDER
    ================================================================ */
+/* Cards are grouped by layout (in order of first appearance); each sheet holds one layout. */
 function render() {
   var exp    = expandCards();
-  var total  = exp.length;
-  var sheets = Math.max(1, Math.ceil(total / 4));
-  var empty  = sheets * 4 - total;
+  var groups = {};
+  var order  = [];
 
-  infoBar.textContent =
-    total + ' card(s) → ' + sheets + ' folha(s) A4 → ' + empty + ' espaço(s) em branco';
+  exp.forEach(function(c) {
+    if (!groups[c.layout]) { groups[c.layout] = []; order.push(c.layout); }
+    groups[c.layout].push(c);
+  });
+  if (!order.length) { order = [currentLayout]; groups[currentLayout] = []; }
+
+  var totalSheets = 0;
+  var empty       = 0;
+  var parts       = [];
 
   previewArea.innerHTML = '';
 
-  for (var s = 0; s < sheets; s++) {
-    var sheet = document.createElement('div');
-    sheet.className = 'sheet';
+  order.forEach(function(key) {
+    var L      = LAYOUTS[key];
+    var list   = groups[key];
+    var sheets = Math.max(1, Math.ceil(list.length / L.perSheet));
 
-    var grid = document.createElement('div');
-    grid.className = 'card-grid';
+    totalSheets += sheets;
+    empty       += sheets * L.perSheet - list.length;
+    parts.push(L.short + ': ' + sheets);
 
-    for (var c = 0; c < 4; c++) {
-      var idx  = s * 4 + c;
-      var data = idx < exp.length ? exp[idx] : null;
-      grid.appendChild(makeCard(data));
+    for (var s = 0; s < sheets; s++) {
+      var sheet = document.createElement('div');
+      sheet.className = L.portrait ? 'sheet portrait' : 'sheet';
+
+      var grid = document.createElement('div');
+      grid.className = 'card-grid';
+      grid.style.gridTemplateColumns = 'repeat(' + L.cols + ', ' + L.w + 'mm)';
+      grid.style.gridTemplateRows    = 'repeat(' + L.rows + ', ' + L.h + 'mm)';
+
+      for (var c = 0; c < L.perSheet; c++) {
+        grid.appendChild(makeCard(list[s * L.perSheet + c] || null, L));
+      }
+
+      sheet.appendChild(grid);
+      previewArea.appendChild(sheet);
     }
+  });
 
-    sheet.appendChild(grid);
-    previewArea.appendChild(sheet);
-  }
+  infoBar.textContent = exp.length + ' card(s) → ' + totalSheets + ' folha(s) A4 (' +
+    parts.join(' · ') + ') → ' + empty + ' espaço(s) em branco';
 }
 
 /* ================================================================
