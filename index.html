@@ -599,6 +599,38 @@
       text-align: center;
     }
 
+    #overflowWarn.info {
+      background: rgba(168, 216, 234, 0.08);
+      border-color: var(--border);
+      color: var(--highlight);
+    }
+
+    #overflowWarn button {
+      margin-left: 10px;
+      padding: 4px 12px;
+      background: var(--red);
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .auto-shrink {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px;
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .auto-shrink input { accent-color: var(--highlight); cursor: pointer; }
+    .auto-shrink .field-hint { margin: 0; }
+
     /* While measuring: one physical line per explicit line, to detect wrapping. */
     .measuring .card-text-area p { white-space: nowrap; }
 
@@ -941,6 +973,12 @@
         <input type="number" id="repeatInput" value="1" min="1" max="200">
       </div>
     </div>
+
+    <label class="auto-shrink">
+      <input type="checkbox" id="autoShrink">
+      Reduzir só as caixas que não couberem
+      <span class="field-hint">— a letra encolhe apenas nelas, até caber; as demais ficam no tamanho escolhido.</span>
+    </label>
 
     <div class="align-section">
       <span class="align-section-label">Alinhamento</span>
@@ -1854,39 +1892,88 @@ function render() {
 
 /* ================================================================
    OVERFLOW CHECK
-   A box is flagged when any explicit line is wider than the box
-   (it would wrap) or the wrapped text is taller than the box (cut off).
-   Reads are batched per pass to avoid one layout per card.
+   Wrapped: the text is taller as rendered than with automatic wrapping
+   off (white-space: nowrap keeps only the explicit line breaks).
+   Comparing two heights of the same element avoids the sub-pixel width
+   rounding that flagged boxes which visibly fit.
+   Cut off: the text is taller than its box.
    ================================================================ */
 const overflowWarn = document.getElementById('overflowWarn');
+const autoShrinkEl = document.getElementById('autoShrink');
 
-function checkOverflow() {
-  if (printing) return;
-  var areas = Array.prototype.slice.call(previewArea.querySelectorAll('.card-text-area'));
+try { autoShrinkEl.checked = localStorage.getItem('etiqueta.autoShrink') === '1'; } catch (_) {}
+autoShrinkEl.addEventListener('change', function() {
+  try { localStorage.setItem('etiqueta.autoShrink', autoShrinkEl.checked ? '1' : '0'); } catch (_) {}
+  render();
+});
 
-  previewArea.classList.add('measuring');
-  var tooWide = areas.map(function(ta) {
-    return ta.firstChild.scrollWidth > ta.clientWidth + 1;
-  });
-  previewArea.classList.remove('measuring');
-
-  var count = 0;
-  areas.forEach(function(ta, i) {
-    var bad = tooWide[i] || ta.firstChild.offsetHeight > ta.clientHeight + 1;
-    ta.parentNode.classList.toggle('overflow', bad);
-    if (bad) count++;
-  });
-
-  overflowWarn.hidden = !count;
-  overflowWarn.textContent = count
-    ? '⚠ ' + count + ' caixa(s) com texto que não cabe em uma linha ou na altura no tamanho atual — verifique as marcadas em vermelho.'
-    : '';
+function textFits(ta) {
+  var p = ta.firstChild;
+  var h = p.offsetHeight;
+  p.style.whiteSpace = 'nowrap';
+  var hLine = p.offsetHeight;
+  p.style.whiteSpace = '';
+  return h <= hLine + 1 && h <= ta.clientHeight + 1;
 }
 
-/* Web fonts change text width; measure again once they finish loading. */
+/* Scales the card's base size and every sized span together, in 5% steps. */
+function shrinkToFit(ta) {
+  var p     = ta.firstChild;
+  var spans = Array.prototype.slice.call(p.querySelectorAll('span'));
+  var base  = parseFloat(p.style.fontSize);
+  var orig  = spans.map(function(s) { return parseFloat(s.style.fontSize); });
+  for (var f = 0.95; f >= 0.3; f -= 0.05) {
+    p.style.fontSize = (base * f).toFixed(2) + 'pt';
+    spans.forEach(function(s, i) { if (orig[i]) s.style.fontSize = (orig[i] * f).toFixed(2) + 'pt'; });
+    if (textFits(ta)) return true;
+  }
+  return false;
+}
+
+function checkOverflow() {
+  var areas = Array.prototype.slice.call(previewArea.querySelectorAll('.card-text-area'));
+
+  /* Batched reads: all rendered heights, then all single-line heights. */
+  var h = areas.map(function(ta) { return ta.firstChild.offsetHeight; });
+  previewArea.classList.add('measuring');
+  var hLine = areas.map(function(ta) { return ta.firstChild.offsetHeight; });
+  previewArea.classList.remove('measuring');
+
+  var bad = areas.filter(function(ta, i) {
+    return h[i] > hLine[i] + 1 || h[i] > ta.clientHeight + 1;
+  });
+
+  var shrunk = 0;
+  if (autoShrinkEl.checked) {
+    bad = bad.filter(function(ta) {
+      if (shrinkToFit(ta)) { shrunk++; return false; }
+      return true;
+    });
+  }
+
+  areas.forEach(function(ta) { ta.parentNode.classList.remove('overflow'); });
+  bad.forEach(function(ta) { ta.parentNode.classList.add('overflow'); });
+
+  overflowWarn.classList.toggle('info', !bad.length && shrunk > 0);
+  overflowWarn.hidden = !bad.length && !shrunk;
+  overflowWarn.innerHTML = '';
+  if (bad.length) {
+    overflowWarn.textContent = '⚠ ' + bad.length + ' caixa(s) com texto que não cabe em uma linha ou na altura no tamanho atual — verifique as marcadas em vermelho.';
+    if (!autoShrinkEl.checked) {
+      var btn = document.createElement('button');
+      btn.textContent = 'Reduzir só essas caixas';
+      btn.onclick = function() { autoShrinkEl.checked = true; autoShrinkEl.dispatchEvent(new Event('change')); };
+      overflowWarn.appendChild(btn);
+    }
+  } else if (shrunk) {
+    overflowWarn.textContent = shrunk + ' caixa(s) com a letra reduzida para caber. As demais seguem no tamanho escolhido.';
+  }
+}
+
+/* Web fonts change text width; render again once they finish loading. */
 if (document.fonts) {
-  document.fonts.ready.then(function() { checkOverflow(); });
-  document.fonts.addEventListener('loadingdone', function() { checkOverflow(); });
+  document.fonts.ready.then(function() { render(); });
+  document.fonts.addEventListener('loadingdone', function() { render(); });
 }
 
 /* ================================================================
