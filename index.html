@@ -453,15 +453,16 @@
        ============================================================ */
     .loc-row {
       display: grid;
-      grid-template-columns: 1fr 1fr auto;
+      grid-template-columns: 1fr 1fr;
       gap: 12px;
       align-items: end;
     }
 
+    .loc-row .loc-btn { grid-column: 1 / -1; }
+
     .loc-btn {
       margin-top: 0;
-      width: auto;
-      padding: 7px 22px;
+      padding: 9px 22px;
     }
 
     #locDe, #locAte {
@@ -1004,10 +1005,20 @@
         <label class="field-label" for="locAte">Até</label>
         <input type="text" id="locAte" placeholder="P01.05E" maxlength="7">
       </div>
+      <div>
+        <label class="field-label" for="locBays">Vãos por prateleira</label>
+        <input type="number" id="locBays" value="4" min="1" max="99">
+      </div>
+      <div>
+        <label class="field-label" for="locLevel">Último nível</label>
+        <select id="locLevel">
+          <option>A</option><option>B</option><option>C</option><option>D</option><option selected>E</option>
+        </select>
+      </div>
       <button class="add-btn loc-btn" onclick="gerarLocalizacoes()">Gerar</button>
     </div>
     <div class="field-hint" id="locHint">
-      Gera todas as combinações da faixa (corredor, prateleira, vão e nível) com o layout, a fonte e o tamanho escolhidos acima.
+      Segue a ordem da prateleira: nível A até o último nível, depois o próximo vão, depois a próxima prateleira.
     </div>
   </div>
 
@@ -1443,19 +1454,60 @@ function parseLoc(s) {
 
 function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
-/* Every combination within the range, per component, in physical order. */
-function enumerateLocations(from, to) {
+function locKey(l) { return (l.p * 100 + l.v) * 100 + l.n; }
+
+/*
+  Physical sequence, like an odometer: level A→last level, then next bay,
+  then next shelf (bay 01, level A). P04.03E → P04.04A → … → P05.01A …
+  Bays per shelf and the last level come from the form; they never go
+  below what De/Até themselves contain.
+*/
+function enumerateLocations(from, to, baysPerShelf, lastLevel) {
   var a = parseLoc(from), b = parseLoc(to);
-  if (!a || !b) return null;
-  var out = [];
-  for (var c = Math.min(a.c, b.c); c <= Math.max(a.c, b.c); c++)
-    for (var p = Math.min(a.p, b.p); p <= Math.max(a.p, b.p); p++)
-      for (var v = Math.min(a.v, b.v); v <= Math.max(a.v, b.v); v++)
-        for (var n = Math.min(a.n, b.n); n <= Math.max(a.n, b.n); n++) {
-          out.push(String.fromCharCode(c) + pad2(p) + '.' + pad2(v) + String.fromCharCode(n));
-          if (out.length > LOC_MAX) return out;
-        }
-  return out;
+  if (!a || !b) return { error: 'format' };
+  if (a.c !== b.c) return { error: 'corridor' };
+  if (locKey(a) > locKey(b)) { var t = a; a = b; b = t; }
+
+  var maxV = Math.max(baysPerShelf, a.v, b.v);
+  var maxN = Math.max(lastLevel.charCodeAt(0), a.n, b.n);
+  var A    = 65;
+  var cur  = { p: a.p, v: a.v, n: a.n };
+  var out  = [];
+  var corr = String.fromCharCode(a.c);
+
+  while (true) {
+    out.push(corr + pad2(cur.p) + '.' + pad2(cur.v) + String.fromCharCode(cur.n));
+    if (cur.p === b.p && cur.v === b.v && cur.n === b.n) return { list: out };
+    if (out.length > LOC_MAX) return { error: 'big' };
+    if (++cur.n > maxN) { cur.n = A; if (++cur.v > maxV) { cur.v = 1; cur.p++; } }
+  }
+}
+
+/* Remembered per browser: shelves rarely change. */
+var locBays  = document.getElementById('locBays');
+var locLevel = document.getElementById('locLevel');
+try {
+  var savedLoc = JSON.parse(localStorage.getItem('etiqueta.loc') || 'null');
+  if (savedLoc) { locBays.value = savedLoc.bays; locLevel.value = savedLoc.level; }
+} catch (_) {}
+
+function saveLocSettings() {
+  try { localStorage.setItem('etiqueta.loc', JSON.stringify({ bays: locBays.value, level: locLevel.value })); } catch (_) {}
+}
+
+/* Reads De/Até and returns { de, ate, list } or { error, message }. */
+function readLocRange() {
+  var de  = document.getElementById('locDe').value.trim().toUpperCase();
+  var ate = document.getElementById('locAte').value.trim().toUpperCase() || de;
+  if (!de) return { error: 'empty' };
+  if (!parseLoc(de))  return { error: 'format', message: '"' + de + '" não está no formato P01.02A.' };
+  if (!parseLoc(ate)) return { error: 'format', message: '"' + ate + '" não está no formato P01.02A.' };
+
+  var bays = Math.min(99, Math.max(1, parseInt(locBays.value, 10) || 1));
+  var r = enumerateLocations(de, ate, bays, locLevel.value);
+  if (r.error === 'corridor') return { error: 'corridor', message: 'De e Até precisam estar no mesmo corredor (mesma letra). Gere um corredor de cada vez.' };
+  if (r.error === 'big')      return { error: 'big', message: 'Faixa grande demais (mais de ' + LOC_MAX + ' etiquetas). Divida em partes.' };
+  return { de: de, ate: ate, list: r.list };
 }
 
 function addLocationBatch(list, title) {
@@ -1480,34 +1532,21 @@ function locHint(text, isError) {
 }
 
 function gerarLocalizacoes() {
-  var de  = document.getElementById('locDe').value.trim().toUpperCase();
-  var ate = document.getElementById('locAte').value.trim().toUpperCase() || de;
-  if (!parseLoc(de))  return locHint('"' + (de || 'De') + '" não está no formato P01.02A.', true);
-  if (!parseLoc(ate)) return locHint('"' + ate + '" não está no formato P01.02A.', true);
+  var r = readLocRange();
+  if (r.error) return locHint(r.message || 'Preencha o campo De.', true);
 
-  var list = enumerateLocations(de, ate);
-  if (list.length > LOC_MAX) return locHint('Faixa grande demais (mais de ' + LOC_MAX + ' etiquetas). Divida em partes.', true);
-
-  addLocationBatch(list, de + ' → ' + ate);
+  addLocationBatch(r.list, r.de + ' → ' + r.ate);
   /* Clear the range so its draft preview doesn't duplicate the batch just added. */
   document.getElementById('locDe').value  = '';
   document.getElementById('locAte').value = '';
-  locHint(list.length + ' etiqueta(s) gerada(s): ' + de + ' → ' + ate + '.');
-}
-
-function locRange() {
-  var de  = document.getElementById('locDe').value.trim().toUpperCase();
-  var ate = document.getElementById('locAte').value.trim().toUpperCase() || de;
-  if (!parseLoc(de) || !parseLoc(ate)) return null;
-  var list = enumerateLocations(de, ate);
-  return list.length > LOC_MAX ? null : { de: de, ate: ate, list: list };
+  locHint(r.list.length + ' etiqueta(s) gerada(s): ' + r.de + ' → ' + r.ate + '.');
 }
 
 /* The range typed in De/Até, shown in the preview before "Gerar". */
 function locationDraft() {
   if (printing) return null;
-  var r = locRange();
-  if (!r) return null;
+  var r = readLocRange();
+  if (r.error) return null;
   return {
     items:  r.list.map(function(l) { return '<b>' + escapeHTML(l) + '</b>'; }),
     title:  r.de + ' → ' + r.ate,
@@ -1521,27 +1560,29 @@ function locationDraft() {
   };
 }
 
+var LOC_HINT_DEFAULT = 'Segue a ordem da prateleira: nível A até o último nível, depois o próximo vão, depois a próxima prateleira.';
+
 function onLocInput() {
-  var de  = document.getElementById('locDe').value.trim().toUpperCase();
-  var ate = document.getElementById('locAte').value.trim().toUpperCase();
-  var r   = locRange();
-  if (r) {
-    locHint('Prévia: ' + r.list.length + ' etiqueta(s). Clique em Gerar para adicionar.');
-  } else if (de.length === 7 && !parseLoc(de)) {
-    locHint('"' + de + '" não está no formato P01.02A.', true);
-  } else if (ate.length === 7 && !parseLoc(ate)) {
-    locHint('"' + ate + '" não está no formato P01.02A.', true);
-  } else if (parseLoc(de) && (!ate || parseLoc(ate))) {
-    locHint('Faixa grande demais (mais de ' + LOC_MAX + ' etiquetas). Divida em partes.', true);
+  var de  = document.getElementById('locDe').value.trim();
+  var ate = document.getElementById('locAte').value.trim();
+  var r   = readLocRange();
+  if (!r.error) {
+    locHint('Prévia: ' + r.list.length + ' etiqueta(s) — ' + r.list[0] + ' → ' + r.list[r.list.length - 1] + '. Clique em Gerar para adicionar.');
+  } else if (r.error === 'format' && (de.length < 7 || (ate && ate.length < 7))) {
+    locHint(LOC_HINT_DEFAULT);   /* still typing */
+  } else if (r.message) {
+    locHint(r.message, true);
   } else {
-    locHint('Gera todas as combinações da faixa (corredor, prateleira, vão e nível) com o layout, a fonte e o tamanho escolhidos acima.');
+    locHint(LOC_HINT_DEFAULT);
   }
+  saveLocSettings();
   scheduleRender();
 }
 
-['locDe', 'locAte'].forEach(function(id) {
+['locDe', 'locAte', 'locBays', 'locLevel'].forEach(function(id) {
   var el = document.getElementById(id);
   el.addEventListener('input', onLocInput);
+  el.addEventListener('change', onLocInput);
   el.addEventListener('keydown', function(e) { if (e.key === 'Enter') gerarLocalizacoes(); });
 });
 
