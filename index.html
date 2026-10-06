@@ -562,11 +562,13 @@
         padding: 24px 24px 14px;
         background: var(--bg);
         display: flex;
+        flex-wrap: wrap;
         gap: 14px;
         align-items: center;
       }
 
       #infoBar { flex: 1; margin: 0; }
+      #overflowWarn { flex-basis: 100%; margin: 0; }
       #printBtn { margin: 0; padding: 11px 36px; }
 
       #previewArea { padding: 10px 24px 48px; }
@@ -582,6 +584,31 @@
     /* ============================================================
        Draft (live preview of the text being typed)
        ============================================================ */
+    /* ============================================================
+       Overflow warning (text wider or taller than its box)
+       ============================================================ */
+    #overflowWarn {
+      margin-bottom: 14px;
+      padding: 10px 16px;
+      background: rgba(233, 69, 96, 0.12);
+      border: 1px solid var(--red);
+      border-radius: 7px;
+      color: #ffb3c0;
+      font-size: 0.83rem;
+      text-align: center;
+    }
+
+    /* While measuring: one physical line per explicit line, to detect wrapping. */
+    .measuring .card-text-area p { white-space: nowrap; }
+
+    @media screen {
+      .card.overflow {
+        position: relative;
+        outline: 3px dashed var(--red);
+        outline-offset: -7px;
+      }
+    }
+
     .card.draft {
       position: relative;
       background: #f3f8ff;
@@ -1003,6 +1030,7 @@
   <div id="previewHeader">
     <div id="infoBar">0 card(s) → 1 folha(s) A4 → 4 espaço(s) em branco</div>
     <button id="printBtn" onclick="printSheets()">Imprimir</button>
+    <div id="overflowWarn" role="alert" hidden></div>
   </div>
   <div id="previewArea"></div>
 </div>
@@ -1780,6 +1808,44 @@ function render() {
     ' → ' + totalSheets + ' folha(s) A4 (' + parts.join(' · ') + ') → ' + empty + ' espaço(s) em branco';
 
   fitPreview();
+  checkOverflow();
+}
+
+/* ================================================================
+   OVERFLOW CHECK
+   A box is flagged when any explicit line is wider than the box
+   (it would wrap) or the wrapped text is taller than the box (cut off).
+   Reads are batched per pass to avoid one layout per card.
+   ================================================================ */
+const overflowWarn = document.getElementById('overflowWarn');
+
+function checkOverflow() {
+  if (printing) return;
+  var areas = Array.prototype.slice.call(previewArea.querySelectorAll('.card-text-area'));
+
+  previewArea.classList.add('measuring');
+  var tooWide = areas.map(function(ta) {
+    return ta.firstChild.scrollWidth > ta.clientWidth + 1;
+  });
+  previewArea.classList.remove('measuring');
+
+  var count = 0;
+  areas.forEach(function(ta, i) {
+    var bad = tooWide[i] || ta.firstChild.offsetHeight > ta.clientHeight + 1;
+    ta.parentNode.classList.toggle('overflow', bad);
+    if (bad) count++;
+  });
+
+  overflowWarn.hidden = !count;
+  overflowWarn.textContent = count
+    ? '⚠ ' + count + ' caixa(s) com texto que não cabe em uma linha ou na altura no tamanho atual — verifique as marcadas em vermelho.'
+    : '';
+}
+
+/* Web fonts change text width; measure again once they finish loading. */
+if (document.fonts) {
+  document.fonts.ready.then(function() { checkOverflow(); });
+  document.fonts.addEventListener('loadingdone', function() { checkOverflow(); });
 }
 
 /* ================================================================
