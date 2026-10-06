@@ -1461,8 +1461,61 @@ function gerarLocalizacoes() {
   if (list.length > LOC_MAX) return locHint('Faixa grande demais (mais de ' + LOC_MAX + ' etiquetas). Divida em partes.', true);
 
   addLocationBatch(list, de + ' → ' + ate);
+  /* Clear the range so its draft preview doesn't duplicate the batch just added. */
+  document.getElementById('locDe').value  = '';
+  document.getElementById('locAte').value = '';
   locHint(list.length + ' etiqueta(s) gerada(s): ' + de + ' → ' + ate + '.');
 }
+
+function locRange() {
+  var de  = document.getElementById('locDe').value.trim().toUpperCase();
+  var ate = document.getElementById('locAte').value.trim().toUpperCase() || de;
+  if (!parseLoc(de) || !parseLoc(ate)) return null;
+  var list = enumerateLocations(de, ate);
+  return list.length > LOC_MAX ? null : { de: de, ate: ate, list: list };
+}
+
+/* The range typed in De/Até, shown in the preview before "Gerar". */
+function locationDraft() {
+  if (printing) return null;
+  var r = locRange();
+  if (!r) return null;
+  return {
+    items:  r.list.map(function(l) { return '<b>' + escapeHTML(l) + '</b>'; }),
+    title:  r.de + ' → ' + r.ate,
+    font:   selectedFont,
+    size:   baseSize,
+    layout: currentLayout,
+    alignV: alignV,
+    alignH: alignH,
+    repeat: 1,
+    draft:  true
+  };
+}
+
+function onLocInput() {
+  var de  = document.getElementById('locDe').value.trim().toUpperCase();
+  var ate = document.getElementById('locAte').value.trim().toUpperCase();
+  var r   = locRange();
+  if (r) {
+    locHint('Prévia: ' + r.list.length + ' etiqueta(s). Clique em Gerar para adicionar.');
+  } else if (de.length === 7 && !parseLoc(de)) {
+    locHint('"' + de + '" não está no formato P01.02A.', true);
+  } else if (ate.length === 7 && !parseLoc(ate)) {
+    locHint('"' + ate + '" não está no formato P01.02A.', true);
+  } else if (parseLoc(de) && (!ate || parseLoc(ate))) {
+    locHint('Faixa grande demais (mais de ' + LOC_MAX + ' etiquetas). Divida em partes.', true);
+  } else {
+    locHint('Gera todas as combinações da faixa (corredor, prateleira, vão e nível) com o layout, a fonte e o tamanho escolhidos acima.');
+  }
+  scheduleRender();
+}
+
+['locDe', 'locAte'].forEach(function(id) {
+  var el = document.getElementById(id);
+  el.addEventListener('input', onLocInput);
+  el.addEventListener('keydown', function(e) { if (e.key === 'Enter') gerarLocalizacoes(); });
+});
 
 /* Link from almoxarifado-gessotins: #locais=P01.01A,P01.01B,... */
 function importFromLink() {
@@ -1491,7 +1544,9 @@ function expandCards() {
   var out  = [];
   var list = cards.slice();
   var d    = draftCard();
-  if (d) list.push(d);
+  var ld   = locationDraft();
+  if (d)  list.push(d);
+  if (ld) list.push(ld);
   list.forEach(function(c) {
     var htmls = c.items || [c.html];
     htmls.forEach(function(h) {
@@ -1546,6 +1601,9 @@ repeatInput.addEventListener('input', scheduleRender);
 function printSheets() {
   if (draftCard() && confirm('O texto do editor ainda não foi adicionado.\n\nOK = adicionar e imprimir\nCancelar = imprimir sem ele')) {
     addCard();
+  }
+  if (locationDraft() && confirm('A faixa de localizações ainda não foi gerada.\n\nOK = gerar e imprimir\nCancelar = imprimir sem ela')) {
+    gerarLocalizacoes();
   }
   window.print();
 }
