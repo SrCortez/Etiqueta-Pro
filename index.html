@@ -420,6 +420,67 @@
 
     .cl-remove:hover { background: var(--red); color: white; }
 
+    .cl-actions {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .cl-apply {
+      padding: 5px 10px;
+      background: transparent;
+      border: 1px solid var(--highlight);
+      border-radius: 4px;
+      color: var(--highlight);
+      font-size: 0.73rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .cl-apply:hover { background: rgba(168, 216, 234, 0.12); }
+
+    .cl-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cl-title .cl-remove { text-transform: none; letter-spacing: 0; }
+
+    /* ============================================================
+       Location Labels
+       ============================================================ */
+    .loc-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .loc-btn {
+      margin-top: 0;
+      width: auto;
+      padding: 7px 22px;
+    }
+
+    #locDe, #locAte {
+      display: block;
+      width: 100%;
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 0.83rem;
+      text-transform: uppercase;
+      outline: none;
+    }
+
+    #locDe:focus, #locAte:focus { border-color: var(--highlight); }
+
+    #locHint.error { color: var(--red); }
+
     /* ============================================================
        Info Bar
        ============================================================ */
@@ -898,9 +959,31 @@
     </button>
   </div>
 
+  <!-- Location Labels Panel -->
+  <div class="panel">
+    <div class="panel-title">Etiquetas de Localização</div>
+    <div class="loc-row">
+      <div>
+        <label class="field-label" for="locDe">De</label>
+        <input type="text" id="locDe" placeholder="P01.01A" maxlength="7">
+      </div>
+      <div>
+        <label class="field-label" for="locAte">Até</label>
+        <input type="text" id="locAte" placeholder="P01.05E" maxlength="7">
+      </div>
+      <button class="add-btn loc-btn" onclick="gerarLocalizacoes()">Gerar</button>
+    </div>
+    <div class="field-hint" id="locHint">
+      Gera todas as combinações da faixa (corredor, prateleira, vão e nível) com o layout, a fonte e o tamanho escolhidos acima.
+    </div>
+  </div>
+
   <!-- Card List Panel -->
   <div class="panel">
-    <div class="panel-title">Cards Adicionados</div>
+    <div class="panel-title cl-title">
+      Cards Adicionados
+      <button class="cl-remove" id="clearAllBtn" onclick="removeAllCards()" style="display:none">✕ Remover todos</button>
+    </div>
     <div id="cardList">
       <p class="cl-empty">Nenhum card adicionado ainda.</p>
     </div>
@@ -1021,14 +1104,16 @@ try { document.execCommand('styleWithCSS', false, false); } catch (_) {}
 /* ================================================================
    LAYOUT PICKER
    ================================================================ */
-document.querySelectorAll('.layout-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    currentLayout = btn.dataset.layout;
-    document.querySelectorAll('.layout-btn').forEach(function(b) {
-      b.classList.toggle('active', b === btn);
-    });
-    scheduleRender();
+function setLayout(key) {
+  currentLayout = key;
+  document.querySelectorAll('.layout-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.layout === key);
   });
+  scheduleRender();
+}
+
+document.querySelectorAll('.layout-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() { setLayout(btn.dataset.layout); });
 });
 
 /* ================================================================
@@ -1287,6 +1372,110 @@ function removeCard(i) {
   render();
 }
 
+function removeAllCards() {
+  if (!confirm('Remover todos os cards adicionados?')) return;
+  cards = [];
+  renderCardList();
+  render();
+}
+
+/* Re-apply the editor's current layout, font, size and alignment to an added card. */
+function applyCurrentSettings(i) {
+  var c = cards[i];
+  c.font   = selectedFont;
+  c.size   = baseSize;
+  c.layout = currentLayout;
+  c.alignV = alignV;
+  c.alignH = alignH;
+  renderCardList();
+  render();
+}
+
+/* ================================================================
+   LOCATION LABELS — address format P01.02A
+   (corridor letter, shelf 2 digits, bay 2 digits, level A–E),
+   same as parseLocal() in almoxarifado-gessotins.
+   ================================================================ */
+var LOC_RE  = /^([A-Z])(\d{2})\.(\d{2})([A-E])$/;
+var LOC_MAX = 1000;
+
+function parseLoc(s) {
+  var m = String(s || '').trim().toUpperCase().match(LOC_RE);
+  if (!m) return null;
+  return { c: m[1].charCodeAt(0), p: +m[2], v: +m[3], n: m[4].charCodeAt(0) };
+}
+
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+/* Every combination within the range, per component, in physical order. */
+function enumerateLocations(from, to) {
+  var a = parseLoc(from), b = parseLoc(to);
+  if (!a || !b) return null;
+  var out = [];
+  for (var c = Math.min(a.c, b.c); c <= Math.max(a.c, b.c); c++)
+    for (var p = Math.min(a.p, b.p); p <= Math.max(a.p, b.p); p++)
+      for (var v = Math.min(a.v, b.v); v <= Math.max(a.v, b.v); v++)
+        for (var n = Math.min(a.n, b.n); n <= Math.max(a.n, b.n); n++) {
+          out.push(String.fromCharCode(c) + pad2(p) + '.' + pad2(v) + String.fromCharCode(n));
+          if (out.length > LOC_MAX) return out;
+        }
+  return out;
+}
+
+function addLocationBatch(list, title) {
+  cards.push({
+    items:  list.map(function(l) { return '<b>' + escapeHTML(l) + '</b>'; }),
+    title:  title,
+    font:   selectedFont,
+    size:   baseSize,
+    layout: currentLayout,
+    alignV: alignV,
+    alignH: alignH,
+    repeat: 1
+  });
+  renderCardList();
+  render();
+}
+
+function locHint(text, isError) {
+  var el = document.getElementById('locHint');
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+}
+
+function gerarLocalizacoes() {
+  var de  = document.getElementById('locDe').value.trim().toUpperCase();
+  var ate = document.getElementById('locAte').value.trim().toUpperCase() || de;
+  if (!parseLoc(de))  return locHint('"' + (de || 'De') + '" não está no formato P01.02A.', true);
+  if (!parseLoc(ate)) return locHint('"' + ate + '" não está no formato P01.02A.', true);
+
+  var list = enumerateLocations(de, ate);
+  if (list.length > LOC_MAX) return locHint('Faixa grande demais (mais de ' + LOC_MAX + ' etiquetas). Divida em partes.', true);
+
+  addLocationBatch(list, de + ' → ' + ate);
+  locHint(list.length + ' etiqueta(s) gerada(s): ' + de + ' → ' + ate + '.');
+}
+
+/* Link from almoxarifado-gessotins: #locais=P01.01A,P01.01B,... */
+function importFromLink() {
+  var m = location.hash.match(/^#locais=(.+)$/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+
+  var list = decodeURIComponent(m[1]).split(',')
+    .map(function(s) { return s.trim().toUpperCase(); })
+    .filter(function(s) { return LOC_RE.test(s); })
+    .slice(0, LOC_MAX);
+  if (!list.length) return;
+
+  setLayout('p32');
+  baseSize = '36pt';
+  syncSizeSelect(baseSize);
+  updateEditorFont();
+  addLocationBatch(list, list[0] + ' → ' + list[list.length - 1] + ' (do estoque)');
+  locHint(list.length + ' local(is) recebido(s) do almoxarifado.');
+}
+
 /* ================================================================
    EXPAND CARDS (apply repeat)
    ================================================================ */
@@ -1295,9 +1484,13 @@ function expandCards() {
   var list = cards.slice();
   var d    = draftCard();
   if (d) list.push(d);
-  for (var i = 0; i < list.length; i++) {
-    for (var r = 0; r < list[i].repeat; r++) out.push(list[i]);
-  }
+  list.forEach(function(c) {
+    var htmls = c.items || [c.html];
+    htmls.forEach(function(h) {
+      var one = c.items ? Object.assign({}, c, { html: h }) : c;
+      for (var r = 0; r < c.repeat; r++) out.push(one);
+    });
+  });
   return out;
 }
 
@@ -1417,6 +1610,7 @@ function makeCard(data, L) {
    ================================================================ */
 function renderCardList() {
   cardListEl.innerHTML = '';
+  document.getElementById('clearAllBtn').style.display = cards.length > 1 ? '' : 'none';
 
   if (!cards.length) {
     cardListEl.innerHTML = '<p class="cl-empty">Nenhum card adicionado ainda.</p>';
@@ -1432,7 +1626,8 @@ function renderCardList() {
 
     var prev = document.createElement('div');
     prev.className       = 'cl-preview';
-    prev.innerHTML       = c.html;
+    if (c.items) prev.textContent = 'Localizações ' + c.title + ' · ' + c.items.length + ' etiqueta(s)';
+    else         prev.innerHTML   = c.html;
     prev.style.fontFamily = "'" + c.font + "', sans-serif";
 
     var meta = document.createElement('div');
@@ -1448,8 +1643,19 @@ function renderCardList() {
     btn.textContent = '✕ Remover';
     (function(idx) { btn.onclick = function() { removeCard(idx); }; })(i);
 
+    var apply = document.createElement('button');
+    apply.className   = 'cl-apply';
+    apply.textContent = '↻ Usar ajustes atuais';
+    apply.title       = 'Aplica o layout, a fonte, o tamanho e o alinhamento escolhidos no editor';
+    (function(idx) { apply.onclick = function() { applyCurrentSettings(idx); }; })(i);
+
+    var actions = document.createElement('div');
+    actions.className = 'cl-actions';
+    actions.appendChild(apply);
+    actions.appendChild(btn);
+
     item.appendChild(info);
-    item.appendChild(btn);
+    item.appendChild(actions);
     cardListEl.appendChild(item);
   });
 }
@@ -1543,6 +1749,8 @@ function removeImage() {
 /* ================================================================
    INIT
    ================================================================ */
+importFromLink();
+window.addEventListener('hashchange', importFromLink);
 render();
 </script>
 </body>
