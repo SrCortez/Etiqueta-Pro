@@ -238,6 +238,12 @@
     .li-half    { grid-template-columns: 1fr 1fr; }
     .li-vhalf   { width: 27px; height: 38px; grid-template-rows: 1fr 1fr; }
     .li-quarter { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .li-32 {
+      background-image:
+        linear-gradient(currentColor 1px, transparent 1px),
+        linear-gradient(90deg, currentColor 1px, transparent 1px);
+      background-size: 25% 12.5%;
+    }
 
     /* ============================================================
        Controls Row
@@ -765,6 +771,9 @@
       <button class="layout-btn active" data-layout="quarter">
         <span class="layout-icon li-quarter"><i></i><i></i><i></i><i></i></span>1/4 página
       </button>
+      <button class="layout-btn" data-layout="p32">
+        <span class="layout-icon li-32"></span>1/32 página
+      </button>
     </div>
 
     <div class="toolbar">
@@ -804,7 +813,10 @@
       <div>
         <label class="field-label" for="sizeSelect">Tamanho</label>
         <select id="sizeSelect">
+          <option value="6pt">6pt</option>
+          <option value="7pt">7pt</option>
           <option value="8pt">8pt</option>
+          <option value="9pt">9pt</option>
           <option value="10pt">10pt</option>
           <option value="12pt">12pt</option>
           <option value="14pt">14pt</option>
@@ -927,7 +939,8 @@ const LAYOUTS = {
   full:    { label: 'Página inteira',        short: 'Inteira', perSheet: 1, cols: 1, rows: 1, w: 286, h: 200 },
   half:    { label: '1/2 página (paisagem)', short: '1/2 paisagem', perSheet: 2, cols: 2, rows: 1, w: 143, h: 200 },
   vhalf:   { label: '1/2 página (retrato)',  short: '1/2 retrato',  perSheet: 2, cols: 1, rows: 2, w: 200, h: 143, portrait: true },
-  quarter: { label: '1/4 página',            short: '1/4',     perSheet: 4, cols: 2, rows: 2, w: 143, h: 100 }
+  quarter: { label: '1/4 página',            short: '1/4',     perSheet: 4, cols: 2, rows: 2, w: 143, h: 100 },
+  p32:     { label: '1/32 página',           short: '1/32',    perSheet: 32, cols: 4, rows: 8, w: 71.5, h: 25, pad: '2mm' }
 };
 
 /* ================================================================
@@ -1363,6 +1376,7 @@ function makeCard(data, L) {
   card.className    = data && data.draft ? 'card draft' : 'card';
   card.style.width  = L.w + 'mm';
   card.style.height = L.h + 'mm';
+  if (L.pad) card.style.padding = L.pad;
 
   if (data) {
     /* Text area */
