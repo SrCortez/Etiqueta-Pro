@@ -238,11 +238,11 @@
     .li-half    { grid-template-columns: 1fr 1fr; }
     .li-vhalf   { width: 27px; height: 38px; grid-template-rows: 1fr 1fr; }
     .li-quarter { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-    .li-32 {
+    .li-grid {
       background-image:
         linear-gradient(currentColor 1px, transparent 1px),
         linear-gradient(90deg, currentColor 1px, transparent 1px);
-      background-size: 25% 12.5%;
+      background-size: calc(100% / var(--gc)) calc(100% / var(--gr));
     }
 
     /* ============================================================
@@ -832,8 +832,14 @@
       <button class="layout-btn active" data-layout="quarter">
         <span class="layout-icon li-quarter"><i></i><i></i><i></i><i></i></span>1/4 página
       </button>
+      <button class="layout-btn" data-layout="p18">
+        <span class="layout-icon li-grid" style="--gc:3;--gr:6"></span>1/18 página
+      </button>
+      <button class="layout-btn" data-layout="p24">
+        <span class="layout-icon li-grid" style="--gc:4;--gr:6"></span>1/24 página
+      </button>
       <button class="layout-btn" data-layout="p32">
-        <span class="layout-icon li-32"></span>1/32 página
+        <span class="layout-icon li-grid" style="--gc:4;--gr:8"></span>1/32 página
       </button>
     </div>
 
@@ -1023,6 +1029,8 @@ const LAYOUTS = {
   half:    { label: '1/2 página (paisagem)', short: '1/2 paisagem', perSheet: 2, cols: 2, rows: 1, w: 143, h: 200 },
   vhalf:   { label: '1/2 página (retrato)',  short: '1/2 retrato',  perSheet: 2, cols: 1, rows: 2, w: 200, h: 143, portrait: true },
   quarter: { label: '1/4 página',            short: '1/4',     perSheet: 4, cols: 2, rows: 2, w: 143, h: 100 },
+  p18:     { label: '1/18 página',           short: '1/18',    perSheet: 18, cols: 3, rows: 6, w: 286 / 3, h: 200 / 6, pad: '2mm' },
+  p24:     { label: '1/24 página',           short: '1/24',    perSheet: 24, cols: 4, rows: 6, w: 71.5, h: 200 / 6, pad: '2mm' },
   p32:     { label: '1/32 página',           short: '1/32',    perSheet: 32, cols: 4, rows: 8, w: 71.5, h: 25, pad: '2mm' }
 };
 
